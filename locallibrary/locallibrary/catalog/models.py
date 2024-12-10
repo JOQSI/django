@@ -1,11 +1,17 @@
+import uuid # Required for unique book instances
 from django.db import models
-from django.urls import reverse
+from django.urls import reverse #Used to generate URLs by reversing the URL patterns
+from django.contrib.auth.models import User
+from datetime import date
+
+
+
 
 class Genre(models.Model):
     """
     Model representing a book genre (e.g. Science Fiction, Non Fiction).
     """
-    name = models.CharField(max_length=200, help_text="Enter a book genre (e.g. Science Fiction, French Poetry etc.)", verbose_name=("Жанр"))
+    name = models.CharField(max_length=200, help_text="Enter a book genre (e.g. Science Fiction, French Poetry etc.)")
 
     def __str__(self):
         """
@@ -14,7 +20,7 @@ class Genre(models.Model):
         return self.name
 
 
-from django.urls import reverse #Used to generate URLs by reversing the URL patterns
+
 
 class Book(models.Model):
     """
@@ -36,14 +42,18 @@ class Book(models.Model):
         """
         return self.title
 
-
     def get_absolute_url(self):
         """
         Returns the url to access a particular book instance.
         """
         return reverse('book-detail', args=[str(self.id)])
 
-import uuid # Required for unique book instances
+    def display_genre(self):
+        """
+        Creates a string for the Genre. This is required to display genre in Admin.
+        """
+        return ', '.join([ genre.name for genre in self.genre.all()[:3] ])
+    display_genre.short_description = 'Genre'
 
 class BookInstance(models.Model):
     """
@@ -53,26 +63,34 @@ class BookInstance(models.Model):
     book = models.ForeignKey('Book', on_delete=models.SET_NULL, null=True)
     imprint = models.CharField(max_length=200)
     due_back = models.DateField(null=True, blank=True)
+    borrower = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+
 
     LOAN_STATUS = (
-        ('m', 'Maintenance'),
-        ('o', 'On loan'),
-        ('a', 'Available'),
-        ('r', 'Reserved'),
+        ('m', 'Обслуживание'),
+        ('o', 'В долг'),
+        ('a', 'Доступный'),
+        ('r', 'Зарезервированный'),
     )
 
     status = models.CharField(max_length=1, choices=LOAN_STATUS, blank=True, default='m', help_text='Book availability')
 
     class Meta:
         ordering = ["due_back"]
+        permissions = (("can_mark_returned", "Установить книгу как возвращенную"),)
 
 
-    def __str__(self):
+    def str(self):
         """
         String for representing the Model object
         """
         return '%s (%s)' % (self.id,self.book.title)
 
+    @property
+    def is_overdue(self):
+        if self.due_back and date.today() > self.due_back:
+            return True
+        return False
 
 class Author(models.Model):
     """
@@ -95,3 +113,7 @@ class Author(models.Model):
         String for representing the Model object.
         """
         return '%s, %s' % (self.last_name, self.first_name)
+
+
+
+
